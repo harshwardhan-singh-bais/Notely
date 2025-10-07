@@ -1,10 +1,32 @@
+
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
+from fastapi.responses import PlainTextResponse
 from typing import Optional
 from schemas import JobStatus
 import os
 import uuid
 
+
+
 router = APIRouter()
+
+# Endpoint to serve generated notes for a video job
+@router.get("/video/notes/{job_id}", response_class=PlainTextResponse)
+def get_video_notes(job_id: str):
+    notes_path = os.path.join("notes", job_id, "notes.md")
+    if not os.path.exists(notes_path):
+        raise HTTPException(status_code=404, detail="Notes not found for this job.")
+    with open(notes_path, "r", encoding="utf-8") as f:
+        return f.read()
+
+# Endpoint to serve generated notes for a video job
+@router.get("/video/notes/{job_id}", response_class=PlainTextResponse)
+def get_video_notes(job_id: str):
+    notes_path = os.path.join("notes", job_id, "notes.md")
+    if not os.path.exists(notes_path):
+        raise HTTPException(status_code=404, detail="Notes not found for this job.")
+    with open(notes_path, "r", encoding="utf-8") as f:
+        return f.read()
 
 UPLOAD_DIR = "uploaded_videos"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -49,6 +71,25 @@ def submit_video_job(
         except Exception as e:
             print(f"[WARN] Whisper transcription failed: {e}")
         # --- End transcription integration ---
+
+        # --- Gemini note generation integration ---
+        try:
+            notes_dir = os.path.join("notes", job_id)
+            os.makedirs(notes_dir, exist_ok=True)
+            notes_md = os.path.join(notes_dir, "notes.md")
+            # Optionally, add alignment path if available (e.g., after running align_srt_with_frames.py)
+            alignment_path = None
+            # If alignment file exists, use it
+            possible_alignment = os.path.join(screenshots_dir, "frame_subtitle_alignment.json")
+            if os.path.exists(possible_alignment):
+                alignment_path = possible_alignment
+            import subprocess
+            subprocess.run([
+                "python", "generate_notes_gemini.py", transcript_txt, notes_md
+            ] + ([alignment_path] if alignment_path else []), check=True)
+        except Exception as e:
+            print(f"[WARN] Gemini note generation failed: {e}")
+        # --- End Gemini integration ---
     elif url:
         source = url
     else:

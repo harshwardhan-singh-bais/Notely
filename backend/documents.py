@@ -1,9 +1,31 @@
+
 from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi.responses import PlainTextResponse
 from typing import List
 from schemas import DocumentMeta
 import os
 
+
+
 router = APIRouter()
+
+# Endpoint to serve generated notes for a document
+@router.get("/document/notes/{doc_id}", response_class=PlainTextResponse)
+def get_document_notes(doc_id: str):
+    notes_path = os.path.join("notes", doc_id, "notes.md")
+    if not os.path.exists(notes_path):
+        raise HTTPException(status_code=404, detail="Notes not found for this document.")
+    with open(notes_path, "r", encoding="utf-8") as f:
+        return f.read()
+
+# Endpoint to serve generated notes for a document
+@router.get("/document/notes/{doc_id}", response_class=PlainTextResponse)
+def get_document_notes(doc_id: str):
+    notes_path = os.path.join("notes", doc_id, "notes.md")
+    if not os.path.exists(notes_path):
+        raise HTTPException(status_code=404, detail="Notes not found for this document.")
+    with open(notes_path, "r", encoding="utf-8") as f:
+        return f.read()
 
 UPLOAD_DIR = "uploaded_documents"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -39,7 +61,19 @@ def upload_document(file: UploadFile = File(...)):
         ], check=True)
     except Exception as e:
         print(f"[WARN] Document text extraction failed: {e}")
-    # --- End integration ---
+
+    # --- Gemini note generation integration ---
+    try:
+        notes_dir = os.path.join("notes", doc_id)
+        os.makedirs(notes_dir, exist_ok=True)
+        notes_md = os.path.join(notes_dir, "notes.md")
+        import subprocess
+        subprocess.run([
+            "python", "generate_notes_gemini.py", extracted_txt, notes_md
+        ], check=True)
+    except Exception as e:
+        print(f"[WARN] Gemini note generation failed: {e}")
+    # --- End Gemini integration ---
 
     # Add to dummy list
     doc = DocumentMeta(
