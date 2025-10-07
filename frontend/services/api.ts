@@ -122,6 +122,15 @@ class ApiService {
     return this.request("/document/list/")
   }
 
+  // Progress tracking endpoints
+  async getDocumentProgress(docId: string): Promise<{ progress: number; stage: string; message: string }> {
+    return this.request(`/document/progress/${docId}`)
+  }
+
+  async getVideoProgress(jobId: string): Promise<{ progress: number; stage: string; message: string }> {
+    return this.request(`/video/progress/${jobId}`)
+  }
+
   // Notes endpoints
   async getNotes(): Promise<Note[]> {
     return this.request("/notes/")

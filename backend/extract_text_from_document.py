@@ -42,6 +42,10 @@ def extract_text(file_path, output_path=None):
         text = extract_text_from_pdf(file_path)
     elif ext in (".docx", ".doc"):
         text = extract_text_from_docx(file_path)
+    elif ext == ".txt":
+        # Handle plain text files for testing
+        with open(file_path, "r", encoding="utf-8") as f:
+            text = f.read()
     else:
         raise ValueError(f"Unsupported file type: {ext}")
     if not text.strip():
@@ -59,4 +63,8 @@ if __name__ == "__main__":
         exit(1)
     file_path = sys.argv[1]
     output_path = sys.argv[2] if len(sys.argv) > 2 else None
-    extract_text(file_path, output_path)
+    try:
+        extract_text(file_path, output_path)
+    except Exception as e:
+        print(f"Error: {e}")
+        exit(1)

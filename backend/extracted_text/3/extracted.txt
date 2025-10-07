@@ -1,0 +1,59 @@
+Public, private, private Cloud
+Public Cloud
+• A Public Cloud is Cloud Computing in which the 
+infrastructure and services are owned and operated by a 
+third-party provider and made available to the public over 
+the internet. 
+• The public can access and use shared resources, such as 
+servers, storage, and applications and the main thing is you 
+pay for what you used.
+• Examples of public cloud providers – are Amazon Web 
+Services (AWS), Microsoft Azure, and Google Cloud Platform 
+(GCP)
+Advantages
+• Cost Efficient
+• Automatic Software Updates
+• Accessibility
+Disadvantages
+Security and Privacy Concerns:
+Limited Control
+Reliance on Internet Connectivity:
+Service Downtime
+Compliance and Regulatory Issues
+Private Cloud
+• A Private Cloud is a cloud computing environment in which the 
+infrastructure and services are owned and operated by a single 
+organization.
+• it is accessed by only authorized users within that organization.
+• Private Cloud organizations have their own data center. 
+• private cloud provides a higher level of security.
+Advantages
+Security Status:
+Customization of Service:
+Privacy:
+Disadvantages
+Higher Cost
+Limited Scalability:
+Technical Complexity:
+Security Risks: 
+Lack of Standardization:
+Maintenance and Upgrades:
+Hybrid Cloud
+• A hybrid cloud is a combination of both public and private cloud
+• take advantage of the benefits of both types of clouds.
+• It can provide greater flexibility, scalability, and cost-effectiveness 
+than using a single cloud environment.
+Advantages
+• Flexibility: Hybrid cloud stores its data (also sensitive) in a private 
+cloud server. While public server provides Flexibility and Scalability.
+• Scalability: Hybrid cloud Enables organizations to move workloads 
+back and forth between their private and public clouds depending on 
+their needs.
+• Security: Hybrid cloud controls over highly sensitive data. and it 
+provides high-level security. Also, it takes advantage of the public 
+cloud’s cost savings.
+• Disadvantages
+Complexity: 
+Cost:
+Security Risks:
+Data Governance:

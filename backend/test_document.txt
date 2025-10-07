@@ -1,0 +1,10 @@
+This is a test document for checking if the document processing pipeline works correctly.
+
+The document contains some sample text that should be extracted and processed by the AI utilities.
+
+Key points:
+- Document text extraction
+- Note generation
+- Error handling
+
+This document should be processed successfully.

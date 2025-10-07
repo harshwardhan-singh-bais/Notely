@@ -25,4 +25,8 @@ if __name__ == "__main__":
         exit(1)
     audio_path = sys.argv[1]
     output_path = sys.argv[2] if len(sys.argv) > 2 else None
-    transcribe_audio_whisper(audio_path, output_path)
+    try:
+        transcribe_audio_whisper(audio_path, output_path)
+    except Exception as e:
+        print(f"Error: {e}")
+        exit(1)

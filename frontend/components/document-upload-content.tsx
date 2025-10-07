@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { FileText, Loader2, CheckCircle2 } from "lucide-react"
@@ -17,13 +17,86 @@ interface UploadedDocument {
   uploadedAt: Date
 }
 
+interface ProcessingStatus {
+  docId: string | null
+  progress: number
+  stage: string
+  message: string
+}
+
 
 export function DocumentUploadContent() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [isUploading, setIsUploading] = useState(false)
-  const [uploadProgress, setUploadProgress] = useState(0)
   const [uploadedDocuments, setUploadedDocuments] = useState<UploadedDocument[]>([])
+  const [processing, setProcessing] = useState<ProcessingStatus>({ docId: null, progress: 0, stage: "", message: "" })
+  const progressInterval = useRef<NodeJS.Timeout | null>(null)
   const { toast } = useToast()
+
+  // Cleanup progress tracking on unmount
+  useEffect(() => {
+    return () => {
+      if (progressInterval.current) {
+        clearInterval(progressInterval.current)
+      }
+    }
+  }, [])
+
+  // Progress tracking function
+  const trackProgress = (docId: string) => {
+    progressInterval.current = setInterval(async () => {
+      try {
+        const progressData = await api.getDocumentProgress(docId)
+        setProcessing({
+          docId,
+          progress: progressData.progress,
+          stage: progressData.stage,
+          message: progressData.message
+        })
+
+        if (progressData.progress >= 100 || progressData.stage === "completed") {
+          if (progressInterval.current) {
+            clearInterval(progressInterval.current)
+          }
+          setIsUploading(false)
+          setProcessing({ docId: null, progress: 0, stage: "", message: "" })
+          
+          // Show success notification
+          toast({
+            title: "Success!",
+            description: "Document processed and notes generated successfully",
+            variant: "default",
+          })
+          
+          // Refresh documents list
+          const docs = await api.getDocuments()
+          setUploadedDocuments(
+            docs.map((doc) => ({
+              id: doc.id,
+              name: doc.name,
+              size: doc.size,
+              status: doc.status,
+              uploadedAt: new Date(doc.uploaded_at),
+            }))
+          )
+        } else if (progressData.stage === "error") {
+          if (progressInterval.current) {
+            clearInterval(progressInterval.current)
+          }
+          setIsUploading(false)
+          setProcessing({ docId: null, progress: 0, stage: "", message: "" })
+          
+          toast({
+            title: "Error",
+            description: progressData.message,
+            variant: "destructive",
+          })
+        }
+      } catch (error) {
+        console.error("Failed to track progress:", error)
+      }
+    }, 1000) // Poll every second
+  }
 
   // Fetch uploaded documents from backend on mount
   useEffect(() => {
@@ -62,51 +135,23 @@ export function DocumentUploadContent() {
     }
 
     setIsUploading(true)
-    setUploadProgress(0)
-
-    // Simulate progress
-    const progressInterval = setInterval(() => {
-      setUploadProgress((prev) => {
-        if (prev >= 90) {
-          clearInterval(progressInterval)
-          return 90
-        }
-        return prev + 10
-      })
-    }, 200)
 
     try {
-      const result = await api.uploadDocument(selectedFile)
-      clearInterval(progressInterval)
-      setUploadProgress(100)
-
-      const newDocument: UploadedDocument = {
-        id: result.document_id,
-        name: selectedFile.name,
-        size: selectedFile.size,
-        status: "pending",
-        uploadedAt: new Date(),
-      }
-
-      setUploadedDocuments((prev) => [newDocument, ...prev])
-
-      toast({
-        title: "Success",
-        description: "Document uploaded successfully",
-      })
-
+      const response = await api.uploadDocument(selectedFile)
+      const docId = response.document_id
+      
+      // Start progress tracking
+      trackProgress(docId)
+      
       setSelectedFile(null)
-      setTimeout(() => setUploadProgress(0), 1000)
     } catch (error) {
       console.error("[v0] Failed to upload document:", error)
-      clearInterval(progressInterval)
+      setIsUploading(false)
       toast({
         title: "Error",
         description: "Failed to upload document",
         variant: "destructive",
       })
-    } finally {
-      setIsUploading(false)
     }
   }
 
@@ -154,13 +199,29 @@ export function DocumentUploadContent() {
               disabled={isUploading}
             />
 
-            {isUploading && uploadProgress > 0 && (
+            {/* Show upload progress */}
+            {isUploading && (
               <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Uploading...</span>
-                  <span className="font-medium text-card-foreground">{uploadProgress}%</span>
-                </div>
-                <Progress value={uploadProgress} className="h-2" />
+                {processing.docId ? (
+                  <>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground capitalize">{processing.stage || 'Processing...'}</span>
+                      <span className="font-medium text-card-foreground">{processing.progress}%</span>
+                    </div>
+                    <Progress value={processing.progress} className="h-2" />
+                    {processing.message && (
+                      <p className="text-xs text-muted-foreground">{processing.message}</p>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Uploading...</span>
+                      <span className="font-medium text-card-foreground">Preparing...</span>
+                    </div>
+                    <Progress value={5} className="h-2" />
+                  </>
+                )}
               </div>
             )}
 
@@ -247,17 +308,25 @@ export function DocumentUploadContent() {
                       <span>{doc.uploadedAt.toLocaleDateString()}</span>
                     </div>
                   </div>
-                  {doc.status === "pending" && (
-                    <Button onClick={() => handleGenerateNotes(doc.id)} size="sm">
-                      Generate Notes
-                    </Button>
-                  )}
-                  {doc.status === "processed" && (
-                    <div className="flex items-center gap-2 text-sm text-accent">
-                      <CheckCircle2 className="h-4 w-4" />
-                      <span>Processed</span>
-                    </div>
-                  )}
+            {/* Show processing status */}
+            {processing.docId === doc.id && (
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground capitalize">{processing.stage}</span>
+                  <span className="font-medium text-card-foreground">{processing.progress}%</span>
+                </div>
+                <Progress value={processing.progress} className="h-2" />
+                {processing.message && (
+                  <p className="text-xs text-muted-foreground">{processing.message}</p>
+                )}
+              </div>
+            )}
+            {processing.docId !== doc.id && doc.status === "processed" && (
+              <div className="flex items-center gap-2 text-sm text-accent">
+                <CheckCircle2 className="h-4 w-4" />
+                <span>Processed</span>
+              </div>
+            )}
                 </div>
               ))}
             </div>

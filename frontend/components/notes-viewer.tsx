@@ -16,10 +16,11 @@ const NotesViewer: React.FC<NotesViewerProps> = ({ jobOrDocId, type }) => {
       setLoading(true);
       setError("");
       try {
+        const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
         const endpoint =
           type === "video"
-            ? `/api/video/notes/${jobOrDocId}`
-            : `/api/document/notes/${jobOrDocId}`;
+            ? `${API_BASE_URL}/video/notes/${jobOrDocId}`
+            : `${API_BASE_URL}/document/notes/${jobOrDocId}`;
         const res = await fetch(endpoint);
         if (!res.ok) throw new Error("Notes not found");
         const text = await res.text();
