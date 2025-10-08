@@ -1,0 +1,2 @@
+# This file ensures the ai_screenshots directory is tracked in git
+# The directory is needed for video processing but the generated screenshots are ignored

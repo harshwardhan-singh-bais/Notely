@@ -1,0 +1,2 @@
+# This file ensures the uploaded_videos directory is tracked in git
+# The directory is needed for video uploads but the video files are ignored

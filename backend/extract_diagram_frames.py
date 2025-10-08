@@ -2,13 +2,27 @@ import os
 import cv2
 import torch
 import clip
+import json
 from PIL import Image
 from tqdm import tqdm
 
 # CONFIG
-FRAME_INTERVAL = 1  # seconds between frames to check
-SIMILARITY_THRESHOLD = 0.28  # tune this for your use case
-PROMPTS = ["a diagram", "a slide", "a chart", "a graph", "a table"]
+FRAME_INTERVAL = 0.5  # seconds between frames to check (more frequent)
+SIMILARITY_THRESHOLD = 0.22  # lower threshold for more sensitivity
+PROMPTS = [
+    "a diagram", 
+    "a slide presentation", 
+    "a chart or graph", 
+    "text content on screen", 
+    "a table with data",
+    "a code snippet or programming",
+    "a flowchart or process diagram",
+    "a mathematical equation or formula",
+    "an infographic or visual explanation",
+    "a screenshot of an application",
+    "educational content or tutorial",
+    "a whiteboard or blackboard with writing"
+]
 
 
 def extract_relevant_frames(video_path, output_dir):
@@ -46,9 +60,32 @@ def extract_relevant_frames(video_path, output_dir):
                 similarity = (100.0 * image_features @ text_features.T).softmax(dim=-1)
                 max_sim, idx = similarity[0].max(0)
                 if max_sim.item() > SIMILARITY_THRESHOLD:
-                    out_path = os.path.join(output_dir, f"frame_{frame_idx}.jpg")
+                    timestamp = frame_idx / fps
+                    out_path = os.path.join(output_dir, f"frame_{frame_idx:06d}_t{timestamp:.1f}s.jpg")
                     img.save(out_path)
                     saved += 1
+                    
+                    # Save metadata about this frame
+                    prompt_idx = idx.item()
+                    confidence = max_sim.item()
+                    metadata = {
+                        'frame_idx': frame_idx,
+                        'timestamp': timestamp,
+                        'prompt_matched': PROMPTS[prompt_idx],
+                        'confidence': confidence,
+                        'filename': os.path.basename(out_path)
+                    }
+                    
+                    # Save metadata to JSON file
+                    metadata_path = os.path.join(output_dir, "frame_metadata.json")
+                    if os.path.exists(metadata_path):
+                        with open(metadata_path, "r") as f:
+                            all_metadata = json.load(f)
+                    else:
+                        all_metadata = []
+                    all_metadata.append(metadata)
+                    with open(metadata_path, "w") as f:
+                        json.dump(all_metadata, f, indent=2)
         frame_idx += 1
         pbar.update(1)
     pbar.close()

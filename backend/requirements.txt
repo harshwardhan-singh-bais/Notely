@@ -23,3 +23,5 @@ transformers
 tqdm
 Pillow
 git+https://github.com/openai/CLIP.git
+yt-dlp
+google-generativeai

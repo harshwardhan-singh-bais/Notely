@@ -1,29 +1,74 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
-# dependencies
-/node_modules
+# Environment files
+.env
+.env.local
+.env.*.local
 
-# next.js
-/.next/
-/out/
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
 
-# production
-/build
+# OS files
+.DS_Store
+Thumbs.db
 
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
+# Logs
+*.log
+logs/
 
-# env files
-.env*
+# Database
+*.db
+*.sqlite3
 
-# vercel
-.vercel
+# Temporary files
+*.tmp
+*.temp
 
-# typescript
-*.tsbuildinfo
-next-env.d.ts
-echo "*.mp4" >> .gitignore
-git add .gitignore
+# User uploaded content (keep structure but not files)
+uploaded_videos/*.mp4
+uploaded_videos/*.avi
+uploaded_videos/*.mov
+uploaded_videos/*.mkv
+uploaded_documents/*.pdf
+uploaded_documents/*.docx
+uploaded_documents/*.txt
+
+# Generated content directories (keep structure but not files)
+ai_screenshots/*/
+transcripts/*/
+notes/*/
+extracted_text/*/
+
+# Test files
+test_*
+*_test.py
+
+# FFmpeg executable (will be downloaded when needed)
+ffmpeg.exe
+
+# Cache and temporary directories
+downloads/
+test_transcripts/

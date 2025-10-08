@@ -1,0 +1,2 @@
+# This file ensures the extracted_text directory is tracked in git
+# The directory is needed for document processing but the extracted text files are ignored

@@ -1,0 +1,2 @@
+# This file ensures the uploaded_documents directory is tracked in git
+# The directory is needed for document uploads but the document files are ignored

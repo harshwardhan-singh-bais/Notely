@@ -42,6 +42,24 @@ def generate_notes_gemini(prompt, api_key, model_name="models/gemini-2.5-flash")
     response = model.generate_content(prompt)
     return response.text
 
+def generate_notes_from_transcript(transcript_content, alignment_path=None, screenshots_dir=None):
+    """Generate notes from transcript content directly (for API calls)"""
+    api_key = load_api_key()
+    
+    # Load alignment if available
+    alignment = None
+    if alignment_path and os.path.exists(alignment_path):
+        with open(alignment_path, "r", encoding="utf-8") as f:
+            alignment = json.load(f)
+    
+    # Build prompt with transcript content
+    prompt = build_prompt(transcript_content, alignment, None)
+    
+    # Generate notes
+    notes = generate_notes_gemini(prompt, api_key)
+    
+    return notes
+
 def main(transcript_path, output_path, alignment_path=None, doc_text_path=None):
     api_key = load_api_key()
     transcript, alignment, doc_text = load_inputs(transcript_path, alignment_path, doc_text_path)
