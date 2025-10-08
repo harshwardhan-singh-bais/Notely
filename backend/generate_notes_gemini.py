@@ -26,9 +26,27 @@ def load_inputs(transcript_path, alignment_path=None, doc_text_path=None):
             doc_text = f.read()
     return transcript, alignment, doc_text
 
-def build_prompt(transcript, alignment=None, doc_text=None):
+def build_prompt(transcript, alignment=None, doc_text=None, transcript_source="unknown", subtitle_info=None):
     prompt = """You are an expert note-taker. Given the following transcript and (optionally) document text and screenshot alignments, generate extensive, human-like notes. Interleave text and image references (e.g., [Image: frame_123.jpg]) where relevant. Use markdown for formatting.\n\n"""
+    
+    # Add transcript source information
+    if transcript_source == "manual_subtitles":
+        prompt += "**Transcript Source**: Manual subtitles/captions (high accuracy)\n\n"
+    elif transcript_source == "auto_subtitles":
+        prompt += "**Transcript Source**: Auto-generated subtitles (good accuracy)\n\n"
+    elif transcript_source == "whisper_audio":
+        prompt += "**Transcript Source**: AI audio transcription (Whisper)\n\n"
+    else:
+        prompt += "**Transcript Source**: Unknown\n\n"
+    
     prompt += f"Transcript:\n{transcript}\n\n"
+    
+    if subtitle_info:
+        prompt += f"**Subtitle Information**:\n"
+        prompt += f"- Language: {subtitle_info.get('language', 'Unknown')}\n"
+        prompt += f"- Method: {subtitle_info.get('method', 'Unknown')}\n"
+        prompt += f"- Segments: {len(subtitle_info.get('timestamps', []))}\n\n"
+    
     if doc_text:
         prompt += f"Document Text:\n{doc_text}\n\n"
     if alignment:
@@ -42,7 +60,7 @@ def generate_notes_gemini(prompt, api_key, model_name="models/gemini-2.5-flash")
     response = model.generate_content(prompt)
     return response.text
 
-def generate_notes_from_transcript(transcript_content, alignment_path=None, screenshots_dir=None):
+def generate_notes_from_transcript(transcript_content, alignment_path=None, screenshots_dir=None, transcript_source="unknown", subtitle_info=None):
     """Generate notes from transcript content directly (for API calls)"""
     api_key = load_api_key()
     
@@ -52,18 +70,18 @@ def generate_notes_from_transcript(transcript_content, alignment_path=None, scre
         with open(alignment_path, "r", encoding="utf-8") as f:
             alignment = json.load(f)
     
-    # Build prompt with transcript content
-    prompt = build_prompt(transcript_content, alignment, None)
+    # Build prompt with transcript content and source information
+    prompt = build_prompt(transcript_content, alignment, None, transcript_source, subtitle_info)
     
     # Generate notes
     notes = generate_notes_gemini(prompt, api_key)
     
     return notes
 
-def main(transcript_path, output_path, alignment_path=None, doc_text_path=None):
+def main(transcript_path, output_path, alignment_path=None, doc_text_path=None, transcript_source="unknown"):
     api_key = load_api_key()
     transcript, alignment, doc_text = load_inputs(transcript_path, alignment_path, doc_text_path)
-    prompt = build_prompt(transcript, alignment, doc_text)
+    prompt = build_prompt(transcript, alignment, doc_text, transcript_source)
     notes = generate_notes_gemini(prompt, api_key)
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(notes)

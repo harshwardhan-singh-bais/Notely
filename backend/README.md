@@ -51,14 +51,37 @@
 ## Features
 
 - **Document Processing**: Upload and process PDF/DOCX files
-- **Video Processing**: 
+- **Enhanced Video Processing**: 
   - YouTube URL support with yt-dlp
+  - **NEW: Smart Subtitle Extraction** - Prioritizes accurate YouTube subtitles over audio transcription
   - Local video file upload
   - AI-powered screenshot extraction using CLIP
-  - Audio transcription with Whisper
-  - Note generation with Gemini AI
+  - Hybrid transcription: Subtitles → Auto-captions → Whisper audio fallback
+  - Enhanced note generation with transcript source metadata
 - **Real-time Progress Tracking**: 0-100% progress updates
 - **Notes Management**: Generated notes storage and retrieval
+
+## Video Processing Enhancement 🆕
+
+The video processing pipeline now uses a **smart hybrid approach**:
+
+### Transcription Priority (for YouTube videos):
+1. **🎯 Manual Subtitles** (Highest accuracy) - Uses human-created captions
+2. **🔄 Auto-generated Subtitles** (Good accuracy) - Uses YouTube's auto-captions  
+3. **🎵 Whisper Audio Transcription** (Fallback) - AI audio transcription
+
+### Benefits:
+- **Higher Accuracy**: Manual subtitles are more accurate than audio transcription
+- **Better Performance**: Subtitle extraction is faster than audio processing
+- **Enhanced Metadata**: Notes include transcript source and language information
+- **Robust Fallback**: Always works even without subtitles
+
+### Note Generation Enhancement:
+Generated notes now include:
+- **Transcript Source**: Manual/Auto subtitles or Whisper audio
+- **Language Information**: Detected subtitle language
+- **Accuracy Indicators**: Method used for transcription
+- **Timing Metadata**: Subtitle timing information
 
 ## API Endpoints
 

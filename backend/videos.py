@@ -134,20 +134,65 @@ def submit_video_job(
                 update_video_progress(job_id, 20, "error", error_msg)
                 return
             
-            # Transcribe audio with Whisper
-            update_video_progress(job_id, 40, "transcribing", "Transcribing audio with Whisper...")
+            # Try subtitle extraction first (for YouTube videos), then fallback to audio transcription
+            update_video_progress(job_id, 40, "transcribing", "Attempting subtitle extraction...")
             transcript_dir = os.path.join("transcripts", job_id)
             transcript_txt = os.path.join(transcript_dir, "transcript.txt")
-            try:
-                from transcribe_whisper import transcribe_audio_whisper
-                os.makedirs(transcript_dir, exist_ok=True)
-                result = transcribe_audio_whisper(file_location, transcript_txt)
-                update_video_progress(job_id, 60, "aligning", "Transcription complete, aligning with frames...")
-            except Exception as e:
-                error_msg = f"Whisper transcription failed: {str(e)}"
-                error_messages.append(error_msg)
-                update_video_progress(job_id, 40, "error", error_msg)
-                return
+            subtitle_txt = os.path.join(transcript_dir, "subtitles.txt")
+            transcript_source = "unknown"
+            
+            os.makedirs(transcript_dir, exist_ok=True)
+            
+            # First attempt: Extract subtitles if this is a YouTube URL
+            subtitle_success = False
+            if url:  # This is a YouTube URL
+                try:
+                    from extract_subtitles import extract_and_process_subtitles
+                    update_video_progress(job_id, 45, "transcribing", "Extracting YouTube subtitles...")
+                    
+                    subtitle_result = extract_and_process_subtitles(url, transcript_dir)
+                    
+                    if subtitle_result['success']:
+                        # Save subtitle text as transcript
+                        with open(transcript_txt, "w", encoding="utf-8") as f:
+                            f.write(subtitle_result['subtitle_text'])
+                        
+                        # Also save subtitle-specific file with metadata
+                        subtitle_info = {
+                            'language': subtitle_result['language'],
+                            'method': subtitle_result['method'],
+                            'timestamps': subtitle_result['timestamps']
+                        }
+                        
+                        with open(subtitle_txt, "w", encoding="utf-8") as f:
+                            f.write(f"# Subtitle Information\n")
+                            f.write(f"Language: {subtitle_info['language']}\n")
+                            f.write(f"Method: {subtitle_info['method']} subtitles\n")
+                            f.write(f"Segments: {len(subtitle_info['timestamps'])}\n\n")
+                            f.write(f"# Subtitle Text\n\n")
+                            f.write(subtitle_result['subtitle_text'])
+                        
+                        subtitle_success = True
+                        transcript_source = f"{subtitle_result['method']}_subtitles"
+                        update_video_progress(job_id, 60, "aligning", f"Subtitle extraction successful ({subtitle_result['method']}), aligning with frames...")
+                        
+                except Exception as e:
+                    print(f"Subtitle extraction failed: {str(e)}")
+                    # Continue to audio transcription fallback
+            
+            # Fallback: Audio transcription with Whisper if subtitles failed or not available
+            if not subtitle_success:
+                try:
+                    from transcribe_whisper import transcribe_audio_whisper
+                    update_video_progress(job_id, 45, "transcribing", "Transcribing audio with Whisper...")
+                    result = transcribe_audio_whisper(file_location, transcript_txt)
+                    transcript_source = "whisper_audio"
+                    update_video_progress(job_id, 60, "aligning", "Audio transcription complete, aligning with frames...")
+                except Exception as e:
+                    error_msg = f"Whisper transcription failed: {str(e)}"
+                    error_messages.append(error_msg)
+                    update_video_progress(job_id, 40, "error", error_msg)
+                    return
             
             # Align subtitles with frames (optional step)
             update_video_progress(job_id, 60, "aligning", "Aligning subtitles with frames...")
@@ -177,12 +222,57 @@ def submit_video_job(
                 with open(transcript_txt, "r", encoding="utf-8") as f:
                     transcript_content = f.read()
                 
-                # Generate notes
-                notes_content = generate_notes_from_transcript(transcript_content, alignment_path, screenshots_dir)
+                # Load subtitle information if available
+                subtitle_info = None
+                if os.path.exists(subtitle_txt):
+                    # Parse subtitle metadata from the subtitle file
+                    try:
+                        with open(subtitle_txt, "r", encoding="utf-8") as f:
+                            subtitle_content = f.read()
+                        
+                        # Extract metadata from subtitle file
+                        lines = subtitle_content.split('\n')
+                        subtitle_info = {}
+                        for line in lines:
+                            if line.startswith('Language:'):
+                                subtitle_info['language'] = line.replace('Language:', '').strip()
+                            elif line.startswith('Method:'):
+                                subtitle_info['method'] = line.replace('Method:', '').strip()
+                            elif line.startswith('Segments:'):
+                                try:
+                                    subtitle_info['segments'] = int(line.replace('Segments:', '').strip())
+                                except:
+                                    subtitle_info['segments'] = 0
+                        
+                        # Create fake timestamps for compatibility
+                        subtitle_info['timestamps'] = [{'start': i, 'end': i+1, 'text': f'Segment {i}'} 
+                                                     for i in range(subtitle_info.get('segments', 0))]
+                    except:
+                        subtitle_info = None
                 
-                # Save notes
+                # Generate notes with enhanced information
+                notes_content = generate_notes_from_transcript(
+                    transcript_content, 
+                    alignment_path, 
+                    screenshots_dir,
+                    transcript_source,
+                    subtitle_info
+                )
+                
+                # Save notes with metadata header
+                notes_with_metadata = f"""# Video Notes
+
+**Source**: {source}
+**Transcript Method**: {transcript_source.replace('_', ' ').title()}
+**Job ID**: {job_id}
+
+---
+
+{notes_content}
+"""
+                
                 with open(notes_md, "w", encoding="utf-8") as f:
-                    f.write(notes_content)
+                    f.write(notes_with_metadata)
                 
                 update_video_progress(job_id, 100, "completed", "Video processing completed successfully!")
                 JOBS[job_id] = JobStatus(job_id=job_id, status="completed")
