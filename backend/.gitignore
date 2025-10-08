@@ -52,6 +52,8 @@ uploaded_videos/*.mp4
 uploaded_videos/*.avi
 uploaded_videos/*.mov
 uploaded_videos/*.mkv
+uploaded_videos/*.part
+uploaded_videos/*.ytdl
 uploaded_documents/*.pdf
 uploaded_documents/*.docx
 uploaded_documents/*.txt
