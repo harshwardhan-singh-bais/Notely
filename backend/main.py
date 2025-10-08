@@ -1,6 +1,7 @@
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from dashboard import router as dashboard_router
 from notes import router as notes_router
@@ -24,6 +25,9 @@ app.include_router(notes_router)
 app.include_router(documents_router)
 app.include_router(videos_router)
 app.include_router(settings_router)
+
+# Mount static files for screenshots
+app.mount("/ai_screenshots", StaticFiles(directory="ai_screenshots"), name="ai_screenshots")
 
 @app.get("/health")
 def health():

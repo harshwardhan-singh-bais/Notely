@@ -26,6 +26,162 @@ def load_inputs(transcript_path, alignment_path=None, doc_text_path=None):
             doc_text = f.read()
     return transcript, alignment, doc_text
 
+def create_time_synchronized_notes(transcript_content, screenshot_metadata, transcript_source, subtitle_info, job_id):
+    """
+    Create notes with screenshots embedded at appropriate time intervals based on content flow
+    """
+    
+    # If we have subtitle timing information, use it for precise synchronization
+    if subtitle_info and 'timestamps' in subtitle_info:
+        return create_subtitle_synchronized_notes(transcript_content, screenshot_metadata, transcript_source, subtitle_info, job_id)
+    else:
+        return create_interval_synchronized_notes(transcript_content, screenshot_metadata, transcript_source, job_id)
+
+def create_subtitle_synchronized_notes(transcript_content, screenshot_metadata, transcript_source, subtitle_info, job_id):
+    """
+    Create notes synchronized with subtitle timestamps
+    """
+    if not subtitle_info or 'timestamps' not in subtitle_info:
+        return create_interval_synchronized_notes(transcript_content, screenshot_metadata, transcript_source, job_id)
+    
+    subtitle_segments = subtitle_info['timestamps']
+    
+    # Group screenshots by time intervals (every 2-3 minutes)
+    screenshot_intervals = group_screenshots_by_intervals(screenshot_metadata, interval_minutes=2)
+    
+    # Build the prompt with time-synchronized content
+    prompt = f"""You are an expert note-taker creating comprehensive notes from a video transcript with visual content.
+
+**CRITICAL INSTRUCTION**: As you write the notes, when you reach content that corresponds to specific time periods, INSERT the relevant screenshot using this EXACT format:
+
+![Description](http://localhost:8000/ai_screenshots/{job_id}/filename.jpg)
+
+**Transcript Source**: {transcript_source.replace('_', ' ').title()}
+
+**Available Screenshots by Time Period**:
+"""
+    
+    for interval, screenshots in screenshot_intervals.items():
+        if screenshots:
+            start_time = interval * 2  # 2-minute intervals
+            end_time = (interval + 1) * 2
+            prompt += f"\n**{start_time}-{end_time} minutes** ({len(screenshots)} screenshots):\n"
+            
+            for screenshot in screenshots[:3]:  # Show top 3 per interval
+                timestamp = screenshot.get('timestamp', 0)
+                filename = screenshot.get('filename', '')
+                content_type = screenshot.get('prompt_matched', 'content')
+                confidence = screenshot.get('confidence', 0)
+                
+                minutes = int(timestamp // 60)
+                seconds = int(timestamp % 60)
+                
+                prompt += f"- {filename}: {content_type} at {minutes}:{seconds:02d} (confidence: {confidence:.2f})\n"
+    
+    prompt += f"""
+
+**Transcript Content**:
+{transcript_content}
+
+**INSTRUCTIONS FOR NOTE CREATION**:
+1. Create comprehensive notes following the transcript content chronologically
+2. When discussing content from specific time periods, INSERT the relevant screenshot immediately
+3. Use the format: ![Screenshot description](http://localhost:8000/ai_screenshots/{job_id}/filename.jpg)
+4. Add a brief description of what the screenshot shows
+5. Continue with the text content naturally
+6. Create logical sections and maintain good flow
+7. Insert screenshots strategically - don't overwhelm, but don't miss important visual content
+
+Generate the notes with embedded screenshots below:
+"""
+    
+    return prompt
+
+def create_interval_synchronized_notes(transcript_content, screenshot_metadata, transcript_source, job_id):
+    """
+    Create notes with screenshots inserted at regular intervals when subtitle timing isn't available
+    """
+    
+    # Estimate content sections based on transcript length
+    transcript_words = len(transcript_content.split())
+    estimated_duration_minutes = transcript_words / 150  # Rough estimate: 150 words per minute
+    
+    # Group screenshots by time intervals
+    screenshot_intervals = group_screenshots_by_intervals(screenshot_metadata, interval_minutes=2)
+    
+    prompt = f"""You are an expert note-taker creating comprehensive notes from a video transcript with visual content.
+
+**CRITICAL INSTRUCTION**: As you progress through the content, INSERT screenshots at appropriate moments using this EXACT format:
+
+![Description](http://localhost:8000/ai_screenshots/{job_id}/filename.jpg)
+
+**Transcript Source**: {transcript_source.replace('_', ' ').title()}
+**Estimated Duration**: {estimated_duration_minutes:.1f} minutes
+
+**Available Screenshots by Time Period**:
+"""
+    
+    for interval, screenshots in screenshot_intervals.items():
+        if screenshots:
+            start_time = interval * 2
+            end_time = (interval + 1) * 2
+            prompt += f"\n**{start_time}-{end_time} minutes** ({len(screenshots)} screenshots):\n"
+            
+            # Show best screenshots for each interval
+            for screenshot in screenshots[:2]:  # Top 2 per interval
+                timestamp = screenshot.get('timestamp', 0)
+                filename = screenshot.get('filename', '')
+                content_type = screenshot.get('prompt_matched', 'content')
+                confidence = screenshot.get('confidence', 0)
+                
+                minutes = int(timestamp // 60)
+                seconds = int(timestamp % 60)
+                
+                prompt += f"- {filename}: {content_type} at {minutes}:{seconds:02d} (confidence: {confidence:.2f})\n"
+    
+    prompt += f"""
+
+**Transcript Content**:
+{transcript_content}
+
+**INSTRUCTIONS FOR NOTE CREATION**:
+1. Divide the content into logical sections (introduction, main topics, conclusion)
+2. As you write each section, consider what time period it represents
+3. INSERT relevant screenshots at natural breakpoints in the content
+4. Use descriptive alt text: ![What the screenshot shows](http://localhost:8000/ai_screenshots/{job_id}/filename.jpg)
+5. Don't cluster all screenshots together - spread them throughout
+6. Prioritize high-confidence screenshots that match the content being discussed
+7. Create a natural flow: text → screenshot → explanation → more text
+
+Generate the notes with naturally embedded screenshots below:
+"""
+    
+    return prompt
+
+def group_screenshots_by_intervals(screenshot_metadata, interval_minutes=2):
+    """
+    Group screenshots into time intervals (e.g., every 2 minutes)
+    """
+    if not screenshot_metadata:
+        return {}
+    
+    intervals = {}
+    interval_seconds = interval_minutes * 60
+    
+    for screenshot in screenshot_metadata:
+        timestamp = screenshot.get('timestamp', 0)
+        interval = int(timestamp // interval_seconds)
+        
+        if interval not in intervals:
+            intervals[interval] = []
+        intervals[interval].append(screenshot)
+    
+    # Sort screenshots within each interval by confidence (highest first)
+    for interval in intervals:
+        intervals[interval].sort(key=lambda x: x.get('confidence', 0), reverse=True)
+    
+    return intervals
+
 def build_prompt(transcript, alignment=None, doc_text=None, transcript_source="unknown", subtitle_info=None, screenshot_metadata=None):
     prompt = """You are an expert note-taker. Given the following transcript and (optionally) document text, screenshot information, and alignments, generate extensive, human-like notes. 
 
@@ -155,13 +311,13 @@ def enhance_notes_with_screenshots(notes, screenshot_metadata, screenshots_dir):
             time_str = f"{minutes}:{seconds:02d}"
             
             notes += f"**{content_type.title()} at {time_str}**\n\n"
-            notes += f"![{content_type} screenshot](ai_screenshots/{job_id}/{filename})\n\n"
+            notes += f"![{content_type} screenshot](http://localhost:8000/ai_screenshots/{job_id}/{filename})\n\n"
             notes += f"*Captured at {timestamp:.1f}s - Confidence: {confidence:.2f}*\n\n"
     
     return notes
 
 def generate_notes_from_transcript(transcript_content, alignment_path=None, screenshots_dir=None, transcript_source="unknown", subtitle_info=None):
-    """Generate notes from transcript content directly (for API calls)"""
+    """Generate notes from transcript content with time-synchronized screenshot integration"""
     api_key = load_api_key()
     
     # Load alignment if available
@@ -172,7 +328,9 @@ def generate_notes_from_transcript(transcript_content, alignment_path=None, scre
     
     # Load screenshot metadata if available
     screenshot_metadata = None
+    job_id = "unknown"
     if screenshots_dir and os.path.exists(screenshots_dir):
+        job_id = os.path.basename(screenshots_dir)
         metadata_file = os.path.join(screenshots_dir, "frame_metadata.json")
         if os.path.exists(metadata_file):
             try:
@@ -181,16 +339,23 @@ def generate_notes_from_transcript(transcript_content, alignment_path=None, scre
             except Exception as e:
                 print(f"Warning: Could not load screenshot metadata: {e}")
     
-    # Build prompt with transcript content, source information, and screenshots
-    prompt = build_prompt(transcript_content, alignment, None, transcript_source, subtitle_info, screenshot_metadata)
+    # Use time-synchronized note generation if we have screenshots
+    if screenshot_metadata:
+        prompt = create_time_synchronized_notes(
+            transcript_content, 
+            screenshot_metadata, 
+            transcript_source, 
+            subtitle_info, 
+            job_id
+        )
+    else:
+        # Fallback to original method if no screenshots
+        prompt = build_prompt(transcript_content, alignment, None, transcript_source, subtitle_info, None)
     
     # Generate notes
     notes = generate_notes_gemini(prompt, api_key)
     
-    # Post-process notes to ensure screenshot references are properly formatted
-    if screenshot_metadata:
-        notes = enhance_notes_with_screenshots(notes, screenshot_metadata, screenshots_dir)
-    
+    # No need for post-processing since screenshots are now embedded naturally
     return notes
 
 def main(transcript_path, output_path, alignment_path=None, doc_text_path=None, transcript_source="unknown", screenshots_dir=None):
